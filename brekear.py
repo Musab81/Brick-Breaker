@@ -80,6 +80,7 @@ class Ball(Block):
                 self.movement_y *= -1 
         if (pygame.sprite.spritecollide(self,self.bricks_group,True)):
             self.movement_y *= -1
+    
 
     def update(self):
         if self.rect.top > screen_height:
@@ -104,12 +105,14 @@ class lives(Block):
         super().__init__(path, x_pos, y_pos)
         original_image = pygame.image.load(path).convert_alpha()
         self.image = pygame.transform.scale(original_image, (40, 40))
-        self.lives=lives
-        self.deaths=0
+        # self.lives=lives
+        # self.deaths=0
     def update(self):
-        if self.deaths >0:
-            self.lives -= self.deaths
-            self.deaths=0
+        # if self.deaths >0:
+        #     self.lives -= self.deaths
+        #     self.deaths=0
+        pass
+
 
 class GameManager():
     def __init__(self,paddle_group,ball_group,lives_group,brick_group):
@@ -117,6 +120,30 @@ class GameManager():
         self.ball_group = ball_group
         self.lives_group = lives_group
         self.brick_group = brick_group
+        self.ball= self.ball_group.sprite
+        self.p_time=0
+
+    def handle_lives(self):
+        self.current_time = pygame.time.get_ticks()
+
+        if self.ball.rect.bottom >= screen_height:
+            if not self.flag:
+                # First time ball touches bottom
+                self.p_time = pygame.time.get_ticks()
+                self.flag = True
+
+                if len(self.lives_group) > 0:
+                    self.lives_group.remove(list(self.lives_group)[-1])
+            else:
+                # Ball is still at the bottom, wait before quitting
+                if len(self.lives_group) == 0:
+                    pygame.quit()
+                    sys.exit()
+        else:
+            # Reset flag once ball is above screen again
+            self.flag = False
+
+
     def run_game(self):
         self.brick_group.draw(screen)
         self.lives_group.draw(screen)
@@ -127,6 +154,7 @@ class GameManager():
         # self.lives_group.update(screen)
         self.paddle_group.update()
         self.ball_group.update()
+        self.handle_lives()
 
 
 #----------------------------
@@ -138,7 +166,7 @@ screen_height = 600
 screen=pygame.display.set_mode((screen_width,screen_height))
 pygame.display.set_caption("Brick Breaker")
 #----------------------------
-basic_font = pygame.font.Font('freesansbold.ttf', 32)
+basic_font = pygame.font.Font('freesansbold.ttf', 100)
 accent_color = (27,35,43)
 col=64
 
