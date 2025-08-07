@@ -1,152 +1,177 @@
-import pygame,sys,random
+import pygame, sys, random
 
-def player_animation():
-    player.x += player_speed
-    if player.right >=screen_width:
-        player.right = screen_width
-    if player.left <= 0:
-        player.left = 0
+class Block(pygame.sprite.Sprite):
+	def __init__(self,path,x_pos,y_pos):
+		super().__init__()
+		self.image = pygame.image.load(path)
+		self.rect = self.image.get_rect(center = (x_pos,y_pos))
+		
+class Paddle(Block):
+    def __init__(self, path, x_pos, y_pos,speed):
+        super().__init__(path, x_pos, y_pos)
+        original_image = pygame.image.load(path).convert_alpha()
+        self.image = pygame.transform.scale(original_image, (140, 15))
+        self.speed =speed
+        self.movement = 0
+    def screen_constrain(self):
+        if self.rect.left <= 0:
+            self.rect.left = 0
+        if self.rect.right >= screen_width:
+            self.rect.right = screen_width
+    def update(self):
+        self.rect.x += self.movement
+        self.screen_constrain()
 
-def ball_animation():
-    global ball_speed_x,ball_speed_y,score,timer_time,lives
-    ball.x += ball_speed_x
-    ball.y += ball_speed_y
-    if ball.colliderect(player) and ball_speed_y>0:
-        pygame.mixer.Sound.play(paddle_sound)
-        if abs(player.left - ball.right) <15:
-            ball_speed_x *= -1
-        elif abs(player.right-ball.left)<15:
-            ball_speed_x *= -1      
-        else:
-            ball_speed_y *= -1  
-    collision = False
-
-    for i in range(6):
-        for o in range(20):
-            if brick[i][o] and ball.colliderect(brick[i][o]):
- 
-                ball_speed_y *= -1
-                collision = True
-                score +=1000
-                break
-        if collision:
-            break 
-    if ball.right >= screen_width or ball.left <= 0:
-        pygame.mixer.Sound.play(paddle_sound)
-        ball_speed_x *= -1
-    if ball.top <= 0 :
-        pygame.mixer.Sound.play(paddle_sound)
-        ball_speed_y *= -1
-    if ball.bottom >= screen_height:
-
-        timer_time=pygame.time.get_ticks()
-        ball.center=(screen_width/2-15,screen_height/2-15)
-        ball_speed_x = 4*random.choice((-1,1))
-        ball_speed_y = -4
-        lives -= 1
-def ball_restart():
-    global ball_speed_x,ball_speed_y,lives,timer_time
-    current_time=pygame.time.get_ticks()
-    if lives >0:
-        if current_time - timer_time <700:
-            number_three = timer_font.render("3",True,p_color)
-            screen.blit(number_three,(screen_width/2-60,screen_height/2+25))
-        elif current_time -timer_time <1400:
-            number_two = timer_font.render("2",True,p_color)
-            screen.blit(number_two,(screen_width/2-60,screen_height/2+25))
-        elif current_time -timer_time <2100:
-            number_one = timer_font.render("1",True,p_color)
-            screen.blit(number_one,(screen_width/2-60,screen_height/2+25))
-        if current_time -timer_time <2100:
-            ball.center=(screen_width/2-15,screen_height/2-15)
-            ball_speed_x,ball_speed_y = 0,0
-        else:
-            timer_time=None
-            ball_speed_x,ball_speed_y=4*random.choice((-1,1)),-4
-def brick_animation():
-    for i in range(6):
-        for o in range(20):
-            if brick[i][o]:
-                if ball.colliderect(brick[i][o]):
-                        pygame.mixer.Sound.play(brick_sound)
-                        brick[i][o]=None
-            if brick[i][o]:
-                pygame.draw.rect(screen,add_colors[o],brick[i][o])
-
-def lives_animation():
-    if lives >= 0:
-        if lives == 3:
-            pygame.draw.ellipse(screen,p_color,circle_1)
-            pygame.draw.ellipse(screen,p_color,circle_2)
-            pygame.draw.ellipse(screen,p_color,circle_3)
-        if lives ==2:
-            pygame.draw.ellipse(screen,p_color,circle_1)
-            pygame.draw.ellipse(screen,p_color,circle_2)
-        if lives == 1:
-            pygame.draw.ellipse(screen,p_color,circle_1)
-    if not(lives >0):
+class Ball(Block):
+    def __init__(self, path, x_pos, y_pos,speed,paddles):
+        super().__init__(path, x_pos, y_pos)
+        original_image = pygame.image.load(path).convert_alpha()
+        self.image = pygame.transform.scale(original_image, (30,30))
+        self.speed = speed
+        self.movement_x = 0
+        self.movement_y = 0
+        self.paddles = paddles
+        self.x_pos = x_pos
+        self.y_pos = y_pos
+        self.active = False
+        self.p_time = 0
+    def ball_reset(self):
+        if self.rect.bottom >= screen_height:
+            self.active = False
+            self.p_time = pygame.time.get_ticks()
+    def ball_restart(self):
         current_time = pygame.time.get_ticks()
-        game_over= timer_font.render("GAME OVER !!!!",True,p_color)
-        screen.blit(game_over,(screen_width/2-420,screen_height/2+25))
-        pygame.mixer.Sound.play(game_over_sound)
-        if current_time - timer_time >2100:
-            pygame.quit()
-            sys.exit()
+        countdown_number = 3
+        if not(self.active): 
+            if current_time - self.p_time < 700:
+                countdown_number = 3
+            elif current_time - self.p_time <1400:
+                countdown_number = 2
+            elif current_time - self.p_time<2100:
+                countdown_number = 1
+            if current_time - self.p_time <2100:
+                self.rect.center = (self.x_pos,self.y_pos)
+                self.movement_x = 0
+                self.movement_y = 0
+            else:
+                self.movement_x = self.speed * random.choice((-1,1))
+                self.movement_y = -self.speed
+                self.active = True
+            time_counter = basic_font.render(str(countdown_number),True,accent_color)
+            screen.blit(time_counter,(screen_width/2,screen_height/2))
+    def collisions(self):
+        if self.rect.top <= 0:
+            self.movement_y = -self.speed
+        if self.rect.left <=0 or self.rect.right >= screen_width:
+            self.movement_x *= -1
+        
+        if (pygame.sprite.spritecollide(self,self.paddles,False)):
+            collision_paddle = pygame.sprite.spritecollide(self,self.paddles,False)[0].rect
+            if abs(self.rect.left - collision_paddle.right) < 15 and self.movement_x > 0:
+                self.movement_x = -self.speed
+            if abs(self.rect.right - collision_paddle.left) < 15 and self.movement_x < 0 :
+                self.movement_x = -self.speed
+            if abs(self.rect.bottom - collision_paddle.top) < 15 and self.movement_y > 0:
+                self.movement_y = -self.speed
+            if abs(self.rect.top - collision_paddle.bottom) < 15 and self.movement_y < 0:
+                self.movement_y = self.speed           
+    def update(self):
+        if self.rect.top > screen_height:
+            self.ball_reset()
+        self.ball_restart()
+        self.collisions()
+        self.rect.x += self.movement_x
+        self.rect.y += self.movement_y
+        
+
+class Bricks(Block):
+    def __init__(self, path, x_pos, y_pos):
+        super().__init__(path, x_pos, y_pos)
+        original_image = pygame.image.load(path).convert_alpha()
+        self.image = pygame.transform.scale(original_image, (50, 32))
+    def update(self):
+        pass
+            
+class lives(Block):
+    def __init__(self, path, x_pos, y_pos,lives):
+        super().__init__(path, x_pos, y_pos)
+        original_image = pygame.image.load(path).convert_alpha()
+        self.image = pygame.transform.scale(original_image, (40, 40))
+        self.lives=lives
+        self.deaths=0
+    def update(self):
+        if self.deaths >0:
+            self.lives -= self.deaths
+            self.deaths=0
+
+class GameManager():
+    def __init__(self,paddle_group,ball_group,lives_group,brick_group):
+        self.paddle_group = paddle_group
+        self.ball_group = ball_group
+        self.lives_group = lives_group
+        self.brick_group = brick_group
+    def run_game(self):
+        self.brick_group.draw(screen)
+        self.lives_group.draw(screen)
+        self.paddle_group.draw(screen)
+        self.ball_group.draw(screen)
+
+        # self.brick_group.update(screen)
+        # self.lives_group.update(screen)
+        # self.paddle_group.update(screen)
+        self.ball_group.update()
 
 
+#----------------------------
+pygame.init()
+clock=pygame.time.Clock()
+
+screen_width = 1000
+screen_height = 600
+screen=pygame.display.set_mode((screen_width,screen_height))
+pygame.display.set_caption("Brick Breaker")
+#----------------------------
+basic_font = pygame.font.Font('freesansbold.ttf', 32)
+accent_color = (27,35,43)
+col=100
 
 
-brick = [[None for _ in range(20)] for _ in range(6)]
-add_colors = [None for _ in range(20)]
+#Game objects
+paddle=Paddle("brick breaker/paddle.png",screen_width/2+150,screen_height-50,7)
+paddle_group = pygame.sprite.GroupSingle()
+paddle_group.add(paddle)
 
-col=64
+ball=Ball("brick breaker/Ball.png",screen_width/2-50,screen_height/2-15,4,paddle_group)
+ball_group = pygame.sprite.GroupSingle()
+ball_group.add(ball)
 
+lives_group = pygame.sprite.Group()
+live=[None for _ in range(3)]
+for i in range(3):
+    live[i] = lives("brick breaker/lives.jpeg",50*(i+1.7),70,3)
+    lives_group.add(live[i])
 
-c=pygame.Color
-colors=[
-    c('red'),
-    c('green'),
-    c('blue'),
-    c('yellow'),
-    c('purple'),
-    c('brown'),
-    c('red'),
-    c('cyan'),
-    c('pink'),
-    c('white')
-]
-for i in range(10):
-    add_colors[i]=colors[i]
-    add_colors[i+10]=colors[i]
-
-
-
-
-p_color=c('gray61')
+brick_group = pygame.sprite.Group()
+brick=[[None for _ in range(20)] for _ in range(6)]
 for i in range(6):
-    for o in range(20):
-        brick[i][o]=pygame.Rect(o*50,col+(32*i),50,32)
+    for j in range(4):
+        brick[i][j]=Bricks("brick breaker/brick(blue).png",(j+4)*50,col+(32*i))
+        brick_group.add(brick[i][j])
 
-player = pygame.Rect(screen_width/2-80,screen_height-50,140,15)
-ball = pygame.Rect(screen_width/2-50,screen_height/2-15,30,30)
-circle_1 =pygame.Rect(0,17,40,40) 
-circle_2 =pygame.Rect(50,17,40,40) 
-circle_3 =pygame.Rect(100,17,40,40) 
+        brick[i][j+4]=Bricks("brick breaker/brick(Green).png",(j+8)*50,col+(32*i))
+        brick_group.add(brick[i][j+4])
 
-player_speed = 0
-ball_speed_x = 4*random.choice((-1,1))
-ball_speed_y = -4
+        brick[i][j+8]=Bricks("brick breaker/brick(orange).png",(j+12)*50,col+(32*i))
+        brick_group.add(brick[i][j+8])
 
-lives = 3 
-score = 000000
-score_font = pygame.font.Font("freesansbold.ttf",75)
-timer_font = pygame.font.Font("freesansbold.ttf",100)
-timer_time = True
+        brick[i][j+12]=Bricks("brick breaker/brick(purple).png",(j+16)*50,col+(32*i))
+        brick_group.add(brick[i][j+12])
 
-brick_sound=pygame.mixer.Sound("brick breaker/brick.mp3")
-paddle_sound=pygame.mixer.Sound("brick breaker/paddle.mp3")
-game_over_sound=pygame.mixer.Sound("brick breaker/game_over.mp3")
+        brick[i][j+16]=Bricks("brick breaker/brick(red).png",(j+20)*50,col+(32*i))
+        brick_group.add(brick[i][j+16])
 
+
+Game_manager = GameManager(paddle_group,ball_group,lives_group,brick_group)
 
 while True:
     for event in pygame.event.get():
@@ -156,33 +181,18 @@ while True:
             sys.exit()
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RIGHT:
-                player_speed += 7
+                paddle.movement += 7
             if event.key == pygame.K_LEFT:
-                player_speed -= 7
+                paddle.movement -= 7
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_RIGHT:
-                player_speed -=7
+                paddle.movement -=7
             if event.key == pygame.K_LEFT:
-                player_speed += 7
-
-    player_animation()
-    if lives>0:
-        ball_animation()
-   
+                paddle.movement += 7
     
 
     screen.fill((0,0,0))
-    brick_animation()
-    for i in range(1,7):
-        pygame.draw.line(screen,(0,0,0),(0,(i*32)+32),(screen_width,(i*32)+32),3)
-    pygame.draw.rect(screen,(p_color),player)
-    pygame.draw.ellipse(screen,p_color,ball)
-    if timer_time:
-        ball_restart()
-    
-    lives_animation()
 
-    score_text = score_font.render(f"{score}",True,p_color)
-    screen.blit(score_text,(screen_width/2-130,0))
+    Game_manager.run_game()
     pygame.display.flip()
     clock.tick(60)
